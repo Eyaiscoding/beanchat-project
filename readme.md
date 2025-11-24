@@ -1,4 +1,4 @@
-# Beanchat – AI Coffee Shop Ordering Assistant ☕🤖
+# Beanchat – AI Coffee Shop Ordering Assistant 
 
 Beanchat is a mobile application designed to reduce long queues in coffee shops by allowing users to place their orders directly through an AI-powered chatbot. Using Large Language Models, Natural Language Processing, and RunPod’s scalable infrastructure, Beanchat provides fast, accurate, and personalized ordering experiences.
 
