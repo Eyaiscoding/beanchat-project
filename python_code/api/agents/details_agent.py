@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 import os
-from .utils import get_chatbot_response,get_embedding
+from api.agents.utils import get_chatbot_response, get_embedding
 from openai import OpenAI
 from copy import deepcopy
 from pinecone import Pinecone
