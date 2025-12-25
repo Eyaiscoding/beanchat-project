@@ -5,10 +5,6 @@ from agents import (GuardAgent,
                     RecommendationAgent,
                     AgentProtocol
                     )
-from typing import Dict
-import os
-import pathlib
-folder_path = pathlib.Path(__file__).parent.resolve()   
 
 class AgentController():
     def __init__(self):

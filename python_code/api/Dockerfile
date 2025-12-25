@@ -17,4 +17,4 @@ COPY main.py main.py
 # COPY test_input.json test_input.json
 
 
-ENTRYPOINT [ "python", "main.py"] 
+ENTRYPOINT [ "python", "main.py"]
