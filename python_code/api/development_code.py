@@ -1,32 +1,32 @@
 from agents import (GuardAgent,
                     ClassificationAgent,
                     DetailsAgent,
-                    OrderTakingAgent,
-                    RecommendationAgent,
-                    AgentProtocol
-                    )
+                    AgentProtocol)
+
+from typing import Dict
 import os
 
 def main():
+    pass
+
+if __name__ == "__main__":
     guard_agent = GuardAgent()
     classification_agent = ClassificationAgent()
-    recommendation_agent = RecommendationAgent('recommendation_objects/apriori_recommendations.json',
-                                                    'recommendation_objects/popularity_recommendation.csv'
-                                                    )
-    agent_dict: dict[str, AgentProtocol] = {
+
+    # Updated agent_dict to match the classification agent's output
+    agent_dict: Dict[str, AgentProtocol] = {
         "details_agent": DetailsAgent(),
-        "order_taking_agent": OrderTakingAgent(recommendation_agent),
-        "recommendation_agent": recommendation_agent
+        "order_taking_agent": DetailsAgent(),  # Replace with OrderTakingAgent() when available
+        "recommendation_agent": DetailsAgent()  # Replace with RecommendationAgent() when available
     }
-    
+
     messages = []
     while True:
-        # Display the chat history
-        os.system('cls' if os.name == 'nt' else 'clear')
-        
-        print("\n\nPrint Messages ...............")
+        # os.system('cls' if os.name == 'nt' else 'clear')
+
+        print("\n\n Print Messages ......")
         for message in messages:
-            print(f"{message['role'].capitalize()}: {message['content']}")
+            print(f"{message['role']}:{message['content']}")
 
         # Get user input
         prompt = input("User: ")
@@ -40,7 +40,7 @@ def main():
         
         # Get ClassificationAgent's response
         classification_agent_response = classification_agent.get_response(messages)
-        chosen_agent=classification_agent_response["memory"]["classification_decision"]
+        chosen_agent = classification_agent_response["memory"]["classification_decision"]
         print("Chosen Agent: ", chosen_agent)
 
         # Get the chosen agent's response
@@ -48,9 +48,3 @@ def main():
         response = agent.get_response(messages)
         
         messages.append(response)
-
-        
-        
-
-if __name__ == "__main__":
-    main()
