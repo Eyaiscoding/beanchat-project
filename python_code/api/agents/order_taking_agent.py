@@ -1,133 +1,379 @@
 import os
 import json
-from .utils import get_chatbot_response,double_check_json_output
-from openai import OpenAI
+import re
+from .utils import get_chatbot_response, double_check_json_output
 from copy import deepcopy
 from dotenv import load_dotenv
+
 load_dotenv()
 
-
 class OrderTakingAgent():
-    def __init__(self, recommendation_agent):
-        self.client = OpenAI(
-            api_key=os.getenv("RUNPOD_TOKEN"),
-            base_url=os.getenv("RUNPOD_CHATBOT_URL"),
-        )
-        self.model_name = os.getenv("MODEL_NAME")
+    def __init__(self):
+        self.menu = {
+            "Cappuccino": 4.50,
+            "Latte": 4.75,
+            "Espresso shot": 2.00,
+            "Dark chocolate (Drinking Chocolate)": 5.00,
+            "Chocolate Croissant": 3.75,
+            "Croissant": 3.25,
+            "Almond Croissant": 4.00,
+            "Jumbo Savory Scone": 3.25,
+            "Cranberry Scone": 3.50,
+            "Oatmeal Scone": 3.25,
+            "Ginger Scone": 3.50,
+            "Chocolate Chip Biscotti": 2.50,
+            "Hazelnut Biscotti": 2.75,
+            "Ginger Biscotti": 2.50,
+            "Chocolate syrup": 1.50,
+            "Hazelnut syrup": 1.50,
+            "Caramel syrup": 1.50,
+            "Sugar Free Vanilla syrup": 1.50,
+            "Dark chocolate (Packaged Chocolate)": 3.00
+        }
+        
+        # Patterns for summary and confirmation
+        self.summary_patterns = [
+            r'\b(no|nope|nah|nothing|none)\b',
+            r'\bthat\'?s?\s+(all|it|everything)\b',
+            r'\b(done|finish|finished|complete)\b',
+            r'\bgood\s+for\s+(today|now)\b',
+            r'\bjust\s+that\b',
+            r'\bnothing\s+else\b',
+        ]
+        
+        self.confirmation_patterns = [
+            r'^(yes|yeah|yep|yup|sure|ok|okay|correct|right|confirm)$',
+            r'^(yes|yeah|yep|yup)\s*(please|thanks|thank you)?$',
+        ]
 
-        self.recommendation_agent = recommendation_agent
-    
-    def get_response(self,messages):
-        messages = deepcopy(messages)
-        system_prompt = """
-            You are a customer support Bot for a coffee shop called "Merry's way"
-
-            here is the menu for this coffee shop.
-
-            Cappuccino - $4.50
-            Jumbo Savory Scone - $3.25
-            Latte - $4.75
-            Chocolate Chip Biscotti - $2.50
-            Espresso shot - $2.00
-            Hazelnut Biscotti - $2.75
-            Chocolate Croissant - $3.75
-            Dark chocolate (Drinking Chocolate) - $5.00
-            Cranberry Scone - $3.50
-            Croissant - $3.25
-            Almond Croissant - $4.00
-            Ginger Biscotti - $2.50
-            Oatmeal Scone - $3.25
-            Ginger Scone - $3.50
-            Chocolate syrup - $1.50
-            Hazelnut syrup - $1.50
-            Carmel syrup - $1.50
-            Sugar Free Vanilla syrup - $1.50
-            Dark chocolate (Packaged Chocolate) - $3.00
-
-            Things to NOT DO:
-            * DON't ask how to pay by cash or Card.
-            * Don't tell the user to go to the counter
-            * Don't tell the user to go to place to get the order
-
-
-            You're task is as follows:
-            1. Take the User's Order
-            2. Validate that all their items are in the menu
-            3. if an item is not in the menu let the user and repeat back the remaining valid order
-            4. Ask them if they need anything else.
-            5. If they do then repeat starting from step 3
-            6. If they don't want anything else. Using the "order" object that is in the output. Make sure to hit all three points
-                1. list down all the items and their prices
-                2. calculate the total. 
-                3. Thank the user for the order and close the conversation with no more questions
-
-            The user message will contain a section called memory. This section will contain the following:
-            "order"
-            "step number"
-            please utilize this information to determine the next step in the process.
-            
-            produce the following output without any additions, not a single letter outside of the structure bellow.
-            Your output should be in a structured json format like so. each key is a string and each value is a string. Make sure to follow the format exactly:
-            {
-            "chain of thought": Write down your critical thinking about what is the maximum task number the user is on write now. Then write down your critical thinking about the user input and it's relation to the coffee shop process. Then write down your thinking about how you should respond in the response parameter taking into consideration the Things to NOT DO section. and Focus on the things that you should not do. 
-            "step number": Determine which task you are on based on the conversation.
-            "order": this is going to be a list of jsons like so. [{"item":put the item name, "quanitity": put the number that the user wants from this item, "price":put the total price of the item }]
-            "response": write the a response to the user
-            }
+    def detect_intent(self, user_text):
         """
+        Detect user intent from their message.
+        Returns: 'add_item', 'show_summary', 'confirm_order', or None
+        """
+        user_text_lower = user_text.lower().strip()
+        
+        # Check for confirmation (after seeing summary)
+        for pattern in self.confirmation_patterns:
+            if re.search(pattern, user_text_lower, re.IGNORECASE):
+                return "confirm_order"
+        
+        # Check for summary request (done ordering)
+        for pattern in self.summary_patterns:
+            if re.search(pattern, user_text_lower, re.IGNORECASE):
+                return "show_summary"
+        
+        # Check if they're mentioning a menu item
+        detected_item = self.fuzzy_match_item(user_text)
+        if detected_item:
+            return "add_item"
+        
+        return None
 
-        last_order_taking_status = ""
-        asked_recommendation_before = False
-        for message_index in range(len(messages)-1,0,-1):
+    def fuzzy_match_item(self, user_text):
+        """Match user input to menu items with fuzzy matching"""
+        user_text_lower = user_text.lower()
+        
+        # Direct keyword mapping for common issues
+        keyword_map = {
+            "chocolate croissant": "Chocolate Croissant",
+            "almond croissant": "Almond Croissant",
+            "latte": "Latte",
+            "cappuccino": "Cappuccino",
+            "espresso": "Espresso shot",
+            "dark chocolate": "Dark chocolate (Drinking Chocolate)",
+            "drinking chocolate": "Dark chocolate (Drinking Chocolate)",
+            "jumbo savory scone": "Jumbo Savory Scone",
+            "jumbo scone": "Jumbo Savory Scone",
+            "savory scone": "Jumbo Savory Scone",
+            "cranberry scone": "Cranberry Scone",
+            "oatmeal scone": "Oatmeal Scone",
+            "ginger scone": "Ginger Scone",
+            "chocolate chip biscotti": "Chocolate Chip Biscotti",
+            "hazelnut biscotti": "Hazelnut Biscotti",
+            "ginger biscotti": "Ginger Biscotti",
+            "chocolate syrup": "Chocolate syrup",
+            "hazelnut syrup": "Hazelnut syrup",
+            "caramel syrup": "Caramel syrup",
+            "vanilla syrup": "Sugar Free Vanilla syrup",
+            "sugar free vanilla": "Sugar Free Vanilla syrup",
+        }
+        
+        # Check keyword map first
+        for keyword, menu_item in keyword_map.items():
+            if keyword in user_text_lower:
+                return menu_item
+        
+        # Check for "croissant" alone (should be plain Croissant)
+        if "croissant" in user_text_lower and "chocolate" not in user_text_lower and "almond" not in user_text_lower:
+            return "Croissant"
+        
+        # Fallback: check if any menu item name appears in text
+        for menu_item in self.menu.keys():
+            if menu_item.lower() in user_text_lower:
+                return menu_item
+        
+        return None
+
+    def get_response(self, messages):
+        messages = deepcopy(messages)
+        user_message = messages[-1]['content']
+        
+        # Get current order state
+        current_order = []
+        last_action = None
+        
+        for message_index in range(len(messages)-1, -1, -1):
             message = messages[message_index]
+            agent_name = message.get("memory", {}).get("agent", "")
             
-            agent_name = message.get("memory",{}).get("agent","")
             if message["role"] == "assistant" and agent_name == "order_taking_agent":
-                step_number = message["memory"]["step number"]
-                order = message["memory"]["order"]
-                asked_recommendation_before = message["memory"]["asked_recommendation_before"]
-                last_order_taking_status = f"""
-                step number: {step_number}
-                order: {order}
-                """
+                current_order = message["memory"].get("order", [])
+                last_action = message["memory"].get("last_action", None)
                 break
+        
+        # Pre-detect intent using pattern matching
+        detected_intent = self.detect_intent(user_message)
+        detected_item = self.fuzzy_match_item(user_message)
+        
+        print(f"[OrderTakingAgent] User message: '{user_message}'")
+        print(f"[OrderTakingAgent] Detected intent: {detected_intent}")
+        print(f"[OrderTakingAgent] Detected item: {detected_item}")
+        print(f"[OrderTakingAgent] Current order: {current_order}")
+        
+        # If we can handle it with pattern matching, do it directly
+        if detected_intent == "confirm_order" and current_order:
+            print("[OrderTakingAgent] Confirming order via pattern match")
+            return {
+                "role": "assistant",
+                "content": "Thank you for your order!",
+                "memory": {
+                    "agent": "order_taking_agent",
+                    "last_action": "confirm_order",
+                    "order": current_order
+                }
+            }
+        
+        if detected_intent == "show_summary" and current_order:
+            print("[OrderTakingAgent] Showing summary via pattern match")
+            summary = self._generate_summary(current_order)
+            return {
+                "role": "assistant",
+                "content": summary,
+                "memory": {
+                    "agent": "order_taking_agent",
+                    "last_action": "show_summary",
+                    "order": current_order
+                }
+            }
+        
+        if detected_intent == "add_item" and detected_item:
+            print(f"[OrderTakingAgent] Adding item via pattern match: {detected_item}")
+            new_order = deepcopy(current_order)
+            new_order.append({
+                "item": detected_item,
+                "quantity": 1,
+                "price": self.menu[detected_item]
+            })
+            return {
+                "role": "assistant",
+                "content": f"Great choice! You've ordered a {detected_item}. Would you like anything else?",
+                "memory": {
+                    "agent": "order_taking_agent",
+                    "last_action": "add_item",
+                    "order": new_order
+                }
+            }
+        
+        # If pattern matching didn't work, fall back to LLM
+        print("[OrderTakingAgent] Falling back to LLM")
+        return self._get_llm_response(messages, current_order, user_message, detected_intent, detected_item)
+    
+    def _get_llm_response(self, messages, current_order, user_message, detected_intent, detected_item):
+        """Fallback to LLM when pattern matching doesn't work"""
+        
+        system_prompt = """You are an order-taking assistant for "Merry's Way" coffee shop.
 
-        messages[-1]['content'] = last_order_taking_status + " \n "+ messages[-1]['content']
+MENU:
+Cappuccino - $4.50
+Latte - $4.75
+Espresso shot - $2.00
+Dark chocolate (Drinking Chocolate) - $5.00
+Chocolate Croissant - $3.75
+Croissant - $3.25
+Almond Croissant - $4.00
+Jumbo Savory Scone - $3.25
+Cranberry Scone - $3.50
+Oatmeal Scone - $3.25
+Ginger Scone - $3.50
+Chocolate Chip Biscotti - $2.50
+Hazelnut Biscotti - $2.75
+Ginger Biscotti - $2.50
+Chocolate syrup - $1.50
+Hazelnut syrup - $1.50
+Caramel syrup - $1.50
+Sugar Free Vanilla syrup - $1.50
+Dark chocolate (Packaged Chocolate) - $3.00
 
-        input_messages = [{"role": "system", "content": system_prompt}] + messages        
+YOUR TASK: Analyze the customer's message and determine the action.
 
-        chatbot_output = get_chatbot_response(self.client,self.model_name,input_messages)
+JSON FORMAT (respond ONLY with this):
+{
+  "action": "add_item" | "show_summary" | "confirm_order",
+  "items_to_add": [{"item": "Menu Item", "quantity": 1, "price": 0.00}],
+  "response": "Your response text"
+}
 
-        # double check json 
-        chatbot_output = double_check_json_output(self.client,self.model_name,chatbot_output)
+RESPONSE RULES:
+- action "add_item": Customer mentions a menu item → add it and ask if they want more
+- action "show_summary": Customer says done/no/that's all → show order summary
+- action "confirm_order": Customer confirms → thank them"""
 
-        output = self.postprocess(chatbot_output,messages,asked_recommendation_before)
-
+        # Build context
+        context = ""
+        if current_order:
+            context += f"CURRENT ORDER:\n{json.dumps(current_order, indent=2)}\n\n"
+        
+        if detected_intent:
+            context += f"DETECTED INTENT: {detected_intent}\n"
+        
+        if detected_item:
+            context += f"DETECTED ITEM: {detected_item}\nYou MUST include this in items_to_add.\n\n"
+        
+        context += f"CUSTOMER MESSAGE: {user_message}"
+        
+        messages[-1]['content'] = context
+        input_messages = [{"role": "system", "content": system_prompt}] + messages[-8:]
+        
+        try:
+            chatbot_output = get_chatbot_response(input_messages, timeout=60)
+            output = self._postprocess_llm(chatbot_output, current_order, user_message, detected_item)
+        except Exception as e:
+            print(f"[OrderTakingAgent] LLM error: {e}")
+            # Ultimate fallback
+            if detected_item:
+                new_order = deepcopy(current_order)
+                new_order.append({"item": detected_item, "quantity": 1, "price": self.menu[detected_item]})
+                output = {
+                    "role": "assistant",
+                    "content": f"Great choice! You've ordered a {detected_item}. Would you like anything else?",
+                    "memory": {
+                        "agent": "order_taking_agent",
+                        "last_action": "add_item",
+                        "order": new_order
+                    }
+                }
+            else:
+                output = {
+                    "role": "assistant",
+                    "content": "I apologize, I had trouble understanding. Could you please repeat?",
+                    "memory": {
+                        "agent": "order_taking_agent",
+                        "last_action": "error",
+                        "order": current_order
+                    }
+                }
+        
         return output
 
-    def postprocess(self,output,messages,asked_recommendation_before):
-        output = json.loads(output)
-
-        if type(output["order"]) == str:
-            output["order"] = json.loads(output["order"])
-
-        response = output['response']
-        if not asked_recommendation_before and len(output["order"])>0:
-            recommendation_output = self.recommendation_agent.get_recommendations_from_order(messages,output['order'])
-            response = recommendation_output['content']
-            asked_recommendation_before = True
-
-        dict_output = {
-            "role": "assistant",
-            "content": response ,
-            "memory": {"agent":"order_taking_agent",
-                       "step number": output["step number"],
-                       "order": output["order"],
-                       "asked_recommendation_before": asked_recommendation_before
-                      }
-        }
-
+    def _postprocess_llm(self, output, current_order, user_message, detected_item):
+        """Process LLM output"""
+        output = output.strip()
         
-        return dict_output
-
+        # Remove markdown
+        output = re.sub(r'^```(?:json)?\s*', '', output)
+        output = re.sub(r'\s*```$', '', output)
+        output = output.strip()
+        
+        # Extract JSON
+        json_match = re.search(r'\{(?:[^{}]|(?:\{[^{}]*\}))*\}', output, re.DOTALL)
+        if json_match:
+            output = json_match.group(0)
+        
+        # Parse JSON
+        try:
+            parsed_output = json.loads(output)
+            print(f"[OrderTakingAgent] LLM parsed JSON: {parsed_output}")
+        except json.JSONDecodeError as e:
+            print(f"[OrderTakingAgent] JSON error: {e}")
+            
+            # Try double check
+            try:
+                output = double_check_json_output(output)
+                parsed_output = json.loads(output)
+            except:
+                # Manual fallback
+                if detected_item:
+                    parsed_output = {
+                        "action": "add_item",
+                        "items_to_add": [{"item": detected_item, "quantity": 1, "price": self.menu[detected_item]}],
+                        "response": f"Great choice! You've ordered a {detected_item}. Would you like anything else?"
+                    }
+                else:
+                    parsed_output = {
+                        "action": "error",
+                        "items_to_add": [],
+                        "response": "I apologize, I had trouble understanding. Could you please repeat?"
+                    }
+        
+        # Extract fields
+        action = parsed_output.get("action", "add_item")
+        items_to_add = parsed_output.get("items_to_add", [])
+        response_text = parsed_output.get("response", "How can I help you?")
+        
+        # Ensure items_to_add is a list
+        if not isinstance(items_to_add, list):
+            items_to_add = []
+        
+        # If LLM failed to extract but we detected an item, add it
+        if action == "add_item" and not items_to_add and detected_item:
+            items_to_add = [{"item": detected_item, "quantity": 1, "price": self.menu[detected_item]}]
+            response_text = f"Great choice! You've ordered a {detected_item}. Would you like anything else?"
+        
+        # Update order
+        new_order = deepcopy(current_order)
+        
+        if action == "add_item" and items_to_add:
+            for item in items_to_add:
+                if isinstance(item, dict) and "item" in item:
+                    new_order.append(item)
+        
+        elif action == "show_summary":
+            if new_order:
+                response_text = self._generate_summary(new_order)
+            else:
+                response_text = "Your order is empty. What would you like to order?"
+        
+        elif action == "confirm_order":
+            response_text = "Thank you for your order!"
+        
+        return {
+            "role": "assistant",
+            "content": response_text,
+            "memory": {
+                "agent": "order_taking_agent",
+                "last_action": action,
+                "order": new_order
+            }
+        }
     
+    def _generate_summary(self, order):
+        """Generate order summary with total"""
+        if not order:
+            return "Your order is empty. Would you like to order something?"
+        
+        summary_parts = []
+        total = 0.0
+        
+        for item in order:
+            item_name = item.get("item", "Unknown item")
+            quantity = item.get("quantity", 1)
+            price = item.get("price", 0.0)
+            item_total = quantity * price
+            total += item_total
+            summary_parts.append(f"{quantity} {item_name} for ${item_total:.2f}")
+        
+        summary = "Here's a summary of your order: " + " and ".join(summary_parts)
+        summary += f". Your total is ${total:.2f}. Would you like to confirm your order?"
+        
+        return summary
