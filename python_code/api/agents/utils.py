@@ -31,8 +31,67 @@ def get_chatbot_response(messages, max_retries=3, timeout=180):
         try:
             print(f"Attempting API call (attempt {attempt + 1}/{max_retries})...")
             response = requests.post(url, json=payload, headers=headers, timeout=timeout)
-            output_text = response.json()["output"][0]["choices"][0]["tokens"][0].strip()
-            return output_text
+            
+            # Debug: print status code and raw response
+            print(f"Response status: {response.status_code}")
+            
+            # Check if response is valid
+            if response.status_code != 200:
+                print(f"❌ Bad status code: {response.status_code}")
+                print(f"Response text: {response.text[:500]}")
+                raise requests.exceptions.RequestException(f"Status {response.status_code}")
+            
+            # Try to parse JSON
+            try:
+                response_json = response.json()
+                print(f"Response JSON keys: {response_json.keys()}")
+            except Exception as e:
+                print(f"❌ Failed to parse JSON: {e}")
+                print(f"Raw response text: {response.text[:500]}")
+                raise
+            
+            # Try multiple possible response formats
+            try:
+                # Original format
+                output_text = response_json["output"][0]["choices"][0]["tokens"][0].strip()
+                return output_text
+            except (KeyError, IndexError, TypeError):
+                pass
+            
+            try:
+                # Alternative format 1: output.text
+                output_text = response_json["output"]["text"]
+                return output_text.strip()
+            except (KeyError, TypeError):
+                pass
+            
+            try:
+                # Alternative format 2: output as string
+                output_text = response_json["output"]
+                if isinstance(output_text, str):
+                    return output_text.strip()
+            except (KeyError, TypeError):
+                pass
+            
+            try:
+                # Alternative format 3: choices format (OpenAI style)
+                output_text = response_json["choices"][0]["message"]["content"]
+                return output_text.strip()
+            except (KeyError, IndexError, TypeError):
+                pass
+            
+            try:
+                # Alternative format 4: direct output list
+                if isinstance(response_json["output"], list):
+                    output_text = response_json["output"][0]
+                    if isinstance(output_text, str):
+                        return output_text.strip()
+            except (KeyError, IndexError, TypeError):
+                pass
+            
+            # If we got here, none of the formats worked
+            print(f"⚠️ Unknown response format. Full response: {response_json}")
+            return "Sorry, I received an unexpected response format."
             
         except requests.exceptions.ReadTimeout:
             print(f"⏱️ Request timed out after {timeout} seconds")
@@ -42,13 +101,6 @@ def get_chatbot_response(messages, max_retries=3, timeout=180):
                 time.sleep(wait_time)
             else:
                 return "I apologize, but I'm experiencing technical difficulties right now."
-        
-        except (KeyError, IndexError) as e:
-            print(f"⚠️ Unexpected response format: {e}")
-            try:
-                return str(response.json())
-            except:
-                return "Sorry, I encountered an error processing the response."
         
         except requests.exceptions.RequestException as e:
             print(f"❌ Request error: {e}")

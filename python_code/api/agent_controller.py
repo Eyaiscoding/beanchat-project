@@ -19,7 +19,7 @@ class AgentController():
 
         self.agent_dict: dict[str, AgentProtocol] = {
             "details_agent": DetailsAgent(),
-            # ✅ FIX: do NOT pass recommendation_agent
+            # do NOT pass recommendation_agent
             "order_taking_agent": OrderTakingAgent(),
             "recommendation_agent": self.recommendation_agent
         }

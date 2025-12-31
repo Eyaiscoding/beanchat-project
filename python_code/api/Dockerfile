@@ -1,20 +1,24 @@
-FROM python:3.8.6-slim
+FROM python:3.11-slim
 
-RUN mkdir /app
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY requirements.txt requirements.txt
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN pip install -r requirements.txt
+COPY requirements.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY recommendation_objects/ recommendation_objects/
 COPY agents/ agents/
 COPY agent_controller.py agent_controller.py
 COPY main.py main.py
 
-# Testing Dockerfile # TO REMOVE AFTER TESTING
-COPY test_input.json test_input.json
+#Test input file for local testing
+#COPY test_input.json test_input.json
 
 
-ENTRYPOINT [ "python", "main.py"]
+ENTRYPOINT ["python", "main.py"]
