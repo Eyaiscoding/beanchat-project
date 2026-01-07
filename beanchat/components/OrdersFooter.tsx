@@ -1,12 +1,30 @@
 import React from "react";
 import { View, Text } from "react-native";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import { Product } from "../types/types";
 
 interface OrdersFooterProps {
   totalPrice: number;
+  products: Product[];
+  quantities: { [key: string]: number };
 }
 
-const OrdersFooter: React.FC<OrdersFooterProps> = ({ totalPrice }) => {
+const OrdersFooter: React.FC<OrdersFooterProps> = ({
+  totalPrice,
+  products,
+  quantities,
+}) => {
+  console.log("OrdersFooter - quantities:", quantities);
+
+  // Get products that are in the cart - check both ID and name
+  const cartProducts = products.filter((product) => {
+    const hasById = (quantities[product.id] || 0) > 0;
+    const hasByName = (quantities[product.name] || 0) > 0;
+    return hasById || hasByName;
+  });
+
+  console.log("OrdersFooter - cartProducts:", cartProducts.length);
+
   return (
     <>
       {/* Discount Badge */}
@@ -28,19 +46,31 @@ const OrdersFooter: React.FC<OrdersFooterProps> = ({ totalPrice }) => {
         </View>
       </View>
 
-      {/* Payment Summary - NO DELIVERY FEE */}
+      {/* Payment Summary */}
       <Text className="mx-7 text-[#242424] text-base font-[Sora-SemiBold] mb-3">
         Payment Summary
       </Text>
 
-      <View className="flex-row justify-between mx-7 mb-3">
-        <Text className="text-sm font-[Sora-Regular] text-[#242424]">
-          Price
-        </Text>
-        <Text className="text-sm font-[Sora-SemiBold] text-[#242424]">
-          DT {totalPrice.toFixed(2)}
-        </Text>
-      </View>
+      {/* Display each cart item with its price */}
+      {cartProducts.map((product) => {
+        // Get quantity - check both ID and name
+        const quantityById = quantities[product.id] || 0;
+        const quantityByName = quantities[product.name] || 0;
+        const quantity = quantityById > 0 ? quantityById : quantityByName;
+        const itemTotal = product.price * quantity;
+
+        return (
+          <View key={product.id} className="flex-row justify-between mx-7 mb-2">
+            <Text className="text-sm font-[Sora-Regular] text-[#242424]">
+              {product.name}
+              {quantity > 1 ? ` x${quantity}` : ""}
+            </Text>
+            <Text className="text-sm font-[Sora-SemiBold] text-[#242424]">
+              DT {itemTotal.toFixed(2)}
+            </Text>
+          </View>
+        );
+      })}
 
       <View className="pb-20" />
     </>

@@ -18,58 +18,86 @@ const ProductList: React.FC<ProductListProps> = ({
   setQuantities,
   totalPrice,
 }) => {
-  const filteredProducts = products.filter(
-    (product) => (quantities[product.name] || 0) > 0
-  );
+  console.log("📦 Products:", products.length);
+  console.log("🛒 Quantities:", quantities);
 
-  const renderItem = ({ item }: { item: Product }) => (
-    <View className="flex-row items-center justify-between mx-7 mb-4">
-      <Image
-        source={{ uri: item.image_url }}
-        className="w-[54px] h-[54px] rounded-2xl"
-      />
-      <View className="flex-1 ml-3">
-        <Text className="text-base font-[Sora-SemiBold] text-[#242424]">
-          {item.name}
-        </Text>
-        <Text className="font-[Sora-Regular] text-xs text-[#A2A2A2] mt-1">
-          {item.category}
-        </Text>
-      </View>
+  // Check if we're using IDs or names in quantities
+  const quantityKeys = Object.keys(quantities);
+  console.log("🔑 Quantity keys:", quantityKeys);
 
-      <View className="flex-row items-center border border-[#EAEAEA] rounded-full px-2 py-1">
-        <TouchableOpacity
-          onPress={() => setQuantities(item.name, -1)}
-          className="px-2"
-        >
+  // Filter products - try both ID and name to be safe
+  const filteredProducts = products.filter((product) => {
+    const hasById = (quantities[product.id] || 0) > 0;
+    const hasByName = (quantities[product.name] || 0) > 0;
+    return hasById || hasByName;
+  });
+
+  console.log("✅ Filtered products:", filteredProducts.length);
+
+  const renderItem = ({ item }: { item: Product }) => {
+    // Get quantity - check both ID and name
+    const quantityById = quantities[item.id] || 0;
+    const quantityByName = quantities[item.name] || 0;
+    const quantity = quantityById > 0 ? quantityById : quantityByName;
+
+    // Determine which key to use for updates
+    const keyToUse = quantityById > 0 ? item.id : item.name;
+
+    return (
+      <View className="flex-row items-center justify-between mx-7 mb-4">
+        <Image
+          source={{ uri: item.image_url }}
+          className="w-[54px] h-[54px] rounded-2xl"
+        />
+        <View className="flex-1 ml-3">
           <Text className="text-base font-[Sora-SemiBold] text-[#242424]">
-            −
+            {item.name}
           </Text>
-        </TouchableOpacity>
-        <Text className="mx-3 text-base font-[Sora-SemiBold] text-[#242424]">
-          {quantities[item.name] || 0}
-        </Text>
-        <TouchableOpacity
-          onPress={() => setQuantities(item.name, 1)}
-          className="px-2"
-        >
-          <Text className="text-base font-[Sora-SemiBold] text-[#242424]">
-            +
+          <Text className="font-[Sora-Regular] text-xs text-[#A2A2A2] mt-1">
+            {item.category}
           </Text>
-        </TouchableOpacity>
+        </View>
+
+        <View className="flex-row items-center border border-[#EAEAEA] rounded-full px-2 py-1">
+          <TouchableOpacity
+            onPress={() => setQuantities(keyToUse, -1)}
+            className="px-2"
+          >
+            <Text className="text-base font-[Sora-SemiBold] text-[#242424]">
+              −
+            </Text>
+          </TouchableOpacity>
+          <Text className="mx-3 text-base font-[Sora-SemiBold] text-[#242424]">
+            {quantity}
+          </Text>
+          <TouchableOpacity
+            onPress={() => setQuantities(keyToUse, 1)}
+            className="px-2"
+          >
+            <Text className="text-base font-[Sora-SemiBold] text-[#242424]">
+              +
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <View>
       {filteredProducts.length > 0 ? (
         <FlatList
           ListHeaderComponent={<OrdersHeader />}
-          ListFooterComponent={<OrdersFooter totalPrice={totalPrice} />}
+          ListFooterComponent={
+            <OrdersFooter
+              totalPrice={totalPrice}
+              products={products}
+              quantities={quantities}
+            />
+          }
           data={filteredProducts}
           renderItem={renderItem}
-          keyExtractor={(item, index) => `${item.name}-${index}`}
+          keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
         />
       ) : (
