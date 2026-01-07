@@ -12,12 +12,28 @@ const fetchProducts = async (): Promise<Product[]> => {
   if (data) {
     for (const key in data) {
       if (data.hasOwnProperty(key)) {
-        products.push({ ...data[key] });
+        // Add the Firebase key as the product ID
+        products.push({
+          id: key, // Use Firebase key as unique ID
+          ...data[key],
+        });
       }
     }
   }
 
-  return products;
+  // Remove duplicates based on product name
+  const uniqueProducts = products.reduce((acc: Product[], current: Product) => {
+    const isDuplicate = acc.find((item) => item.name === current.name);
+    if (!isDuplicate) {
+      return [...acc, current];
+    }
+    return acc;
+  }, []);
+
+  console.log("📦 Total products from Firebase:", products.length);
+  console.log("✅ Unique products after filtering:", uniqueProducts.length);
+
+  return uniqueProducts;
 };
 
 export { fetchProducts };

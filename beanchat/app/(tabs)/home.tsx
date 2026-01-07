@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { Text, View, Image, FlatList, StatusBar } from "react-native";
+import {
+  Text,
+  View,
+  Image,
+  FlatList,
+  StatusBar,
+  Pressable,
+} from "react-native";
 import React from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -43,7 +50,7 @@ const home = () => {
       );
       setShownProducts(filteredProducts);
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, products]);
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -77,10 +84,61 @@ const home = () => {
   if (error) return <Text>{error}</Text>;
 
   const addButton = (name: string) => {
+    console.log("🔵 Add button clicked for:", name);
     addToCart(name, 1);
     Toast.show(`${name} added to cart`, {
       duration: Toast.durations.SHORT,
     });
+  };
+
+  const handleProductPress = (item: Product) => {
+    router.push({
+      pathname: "/details",
+      params: {
+        name: item.name,
+        image_url: item.image_url,
+        type: item.category,
+        price: item.price,
+        rating: item.rating,
+        description: item.description,
+      },
+    });
+  };
+
+  const renderProduct = ({ item, index }: { item: Product; index: number }) => {
+    console.log("Rendering product:", item.name, "at index:", index);
+
+    return (
+      <View className="w-[48%] mt-2 bg-white rounded-2xl p-2 flex justify-between">
+        <TouchableOpacity
+          onPress={() => handleProductPress(item)}
+          activeOpacity={0.7}
+        >
+          <Image
+            source={{ uri: item.image_url }}
+            className="w-full h-32 rounded-2xl"
+          />
+          <Text className="text-[#242424] text-lg font-[Sora-SemiBold] ml-1 mt-2">
+            {item.name}
+          </Text>
+          <Text className="text-[#A2A2A2] text-sm font-[Sora-Regular] ml-1 mt-1">
+            {item.category}
+          </Text>
+        </TouchableOpacity>
+
+        <View className="flex-row justify-between ml-1 mt-4 mb-2">
+          <Text className="text-[#050505] text-xl font-[Sora-SemiBold]">
+            DT {item.price}
+          </Text>
+
+          <Pressable onPress={() => addButton(item.name)}>
+            <View className="mr-2 p-2 -mt-1 bg-app_orange_color rounded-xl">
+              <AntDesign name="plus" size={20} color="white" />
+            </View>
+          </Pressable>
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -95,52 +153,13 @@ const home = () => {
             marginRight: 15,
           }}
           numColumns={2}
-          keyExtractor={(item, index) => index.toString()}
+          keyExtractor={(item, index) => `product-${item.name}-${index}`}
           data={shownProducts}
-          renderItem={({ item }) => (
-            <View className="w-[48%] mt-2 bg-white rounded-2xl p-2 flex justify-between">
-              <TouchableOpacity
-                onPress={() => {
-                  router.push({
-                    pathname: "/details",
-                    params: {
-                      name: item.name,
-                      image_url: item.image_url,
-                      type: item.category,
-                      price: item.price,
-                      rating: item.rating,
-                      description: item.description,
-                    },
-                  });
-                }}
-              >
-                <Image
-                  source={{ uri: item.image_url }}
-                  className="w-full h-32 rounded-2xl"
-                />
-                <Text className="text-[#242424] text-lg font-[Sora-SemiBold] ml-1 mt-2">
-                  {item.name}
-                </Text>
-                <Text className="text-[#A2A2A2] text-sm font-[Sora-Regular] ml-1 mt-1">
-                  {item.category}
-                </Text>
-              </TouchableOpacity>
-
-              <View className="flex-row justify-between ml-1 mt-4 mb-2">
-                <Text className="text-[#050505] text-xl font-[Sora-SemiBold] ">
-                  DT {item.price}
-                </Text>
-
-                {
-                  <TouchableOpacity onPress={() => addButton(item.name)}>
-                    <View className="mr-2 p-2 -mt-1 bg-app_orange_color rounded-xl">
-                      <AntDesign name="plus" size={20} color="white" />
-                    </View>
-                  </TouchableOpacity>
-                }
-              </View>
-            </View>
-          )}
+          renderItem={renderProduct}
+          removeClippedSubviews={true}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
           ListHeaderComponent={() => (
             <View className="flex">
               <SearchArea />
@@ -151,9 +170,11 @@ const home = () => {
                   className="mt-6 w-[90%] mb-2"
                   data={productCategories}
                   horizontal={true}
+                  keyExtractor={(item, index) => `category-${item.id}-${index}`}
                   renderItem={({ item }) => (
                     <TouchableOpacity
                       onPress={() => setSelectedCategory(item.id)}
+                      activeOpacity={0.7}
                     >
                       <Text
                         className={`text-sm mr-4 font-[Sora-Regular] p-3 rounded-lg 
