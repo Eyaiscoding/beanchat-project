@@ -1,73 +1,67 @@
-# Beanchat – AI Coffee Shop Ordering Assistant 
+# Beanchat – AI Coffee Shop Ordering Assistant ☕🤖
 
-Beanchat is a mobile application designed to reduce long queues in coffee shops by allowing users to place their orders directly through an AI-powered chatbot. Using Large Language Models, Natural Language Processing, and RunPod’s scalable infrastructure, Beanchat provides fast, accurate, and personalized ordering experiences.
+Beanchat is a cross-platform mobile application designed to modernize the coffee shop experience. By leveraging **Large Language Models (LLMs)** and a specialized **Multi-Agent Backend**, it allows customers to place orders, ask for menu details, and receive personalized recommendations through a seamless chat interface.
 
-The system uses a modular **agent-based architecture**, where each agent handles a specific task such as classification, recommendations, or information retrieval.
-
----
-
-## 🚀 Project Goals
-
-Beanchat aims to:
-
-- Allow customers to place coffee orders through a conversational chatbot.
-- Reduce pressure on staff and improve order throughput.
-- Provide detailed menu information (ingredients, allergens, etc.) using RAG.
-- Offer relevant product recommendations using market basket analysis.
-- Maintain safe and relevant conversations through guardrails.
+The system is powered by a **Serverless AI Infrastructure** on **RunPod**, ensuring high performance and scalability by offloading heavy AI computations to dedicated cloud GPUs.
 
 ---
 
-# 🧠 System Overview
+## 🧠 System Architecture
 
-## Core Agents
+Beanchat uses a modular **Agent-Based System**. Every user message is routed through specialized modules to ensure accuracy and relevance:
 
-| Agent                    | Role                                                     |
-| ------------------------ | -------------------------------------------------------- |
-| **Guard Agent**          | Filters harmful or irrelevant messages before processing |
-| **Classification Agent** | Determines user intent and routes queries                |
-| **Order Taking Agent**   | Guides users through structured order placement          |
-| **Details Agent (RAG)**  | Answers menu and allergen questions using vector DB      |
-| **Recommendation Agent** | Suggests complementary products based on order context   |
-
----
-
-# 📱 Mobile Application
-
-Built with **React Native**, the app includes:
-
-- Landing Page
-- Home Page
-- Item Details Page
-- Cart Page
-- Integrated Chatbot interface
-
-The application allows customers to interact directly with the AI assistant and browse menu items.
+| Agent | Role | Technical Implementation |
+| :--- | :--- | :--- |
+| **Guard Agent** | Safety & Relevance | [cite_start]Filters out-of-scope or harmful prompts (e.g., math problems or off-topic questions)[cite: 83, 91]. |
+| **Classification Agent** | Intent Routing | [cite_start]Analyzes the query to route it to Ordering, Info, or Recommendation agents based on detected keywords[cite: 716, 735]. |
+| **Order Taking Agent** | Transaction Logic | [cite_start]Manages the cart state and guides users through coffee customization (size, milk, etc.)[cite: 653]. |
+| **Details Agent (RAG)** | Knowledge Retrieval | [cite_start]Answers menu-specific questions using **Vector Search (Pinecone)** and **Embeddings**[cite: 771, 820]. |
+| **Recommendation Agent** | Personalized Upselling | [cite_start]Uses a **Market Basket Analysis (Apriori Algorithm)** to suggest complementary pairings like muffins with lattes[cite: 652]. |
 
 ---
 
-# ⚙️ Tech Stack
+## 🛠 Tech Stack
 
-### Frontend
-
-- React Native
-
-### AI Backend
-
-- RunPod serverless deployment
-- LLM-powered multi-agent architecture
-- Retrieval-Augmented Generation (RAG)
-- Vector database for knowledge storage
+- [cite_start]**Frontend:** React Native (Expo SDK 51), NativeWind (Tailwind CSS), Expo Router[cite: 235, 243].
+- **Backend Orchestration:** Python (Agent logic), Docker.
+- [cite_start]**AI Infrastructure:** - **RunPod Serverless vLLM:** Hosting the Llama LLM for text generation[cite: 144].
+  - [cite_start]**RunPod Infinity:** Hosting the `BAAI/bge-small-en-v1.5` model for RAG embeddings[cite: 780].
+- [cite_start]**Databases:** - **Firebase Realtime DB:** Stores menu items and handles order synchronization[cite: 217, 628].
+  - [cite_start]**Pinecone:** Vector database for semantic search and menu knowledge[cite: 782, 784].
 
 ---
 
-# 🏁 How It Works
+## 🚀 Execution Guide
 
-1. User sends a message in the app.
-2. Guard Agent checks for safety.
-3. Classification Agent determines the user’s intent.
-4. The message is forwarded to the relevant agent:
-   - Order Taking Agent for placing orders
-   - Details Agent for menu questions
-   - Recommendation Agent for upselling
-5. The selected agent processes the message and returns a structured response.
+### 1. Frontend Setup
+The frontend is built with **React Native** and is optimized for Android using **Expo SDK 51**.
+
+1.  **Environment Variables:** Place the `.env` files provided in your project root into the `/beanchat` folder.
+2.  **Install Dependencies:**
+    ```bash
+    cd beanchat
+    npm install
+    ```
+3.  **Run the App:**
+    ```bash
+    npx expo start --tunnel -c
+    ```
+4.  **Mobile Access:** - Install **Expo Go** on your Android device.
+    - Due to specific dependency versions, you **must** use **SDK 51** via this link: [https://expo.dev/go?sdkVersion=51&platform=android&device=true](https://expo.dev/go?sdkVersion=51&platform=android&device=true).
+    - Scan the QR code generated in your terminal to open the app.
+
+### 2. Backend Execution
+The backend is a **Serverless Python API** already deployed and ready for use.
+
+- **Deployment Status:** The backend is containerized via Docker and deployed as a serverless endpoint on **RunPod**.
+- **How it functions:** - The `main.py` script utilizes the `runpod.serverless` handler to process incoming requests.
+    - [cite_start]It orchestrates calls between the **LLM Endpoint** and **Embedding Endpoint** using secure API tokens[cite: 144, 777].
+- **Data Flow:** When a user interacts with the app, the frontend sends the message to the RunPod endpoint. [cite_start]The agents process the intent, query the necessary databases (Firebase/Pinecone), and return a structured response to the mobile client[cite: 756, 764].
+
+---
+
+## 🏁 How the Data Flows
+1. [cite_start]**User Interaction:** User types "I want a Latte" in the app[cite: 345].
+2. [cite_start]**Classification:** The message hits the **RunPod Backend**, where the **Classification Agent** identifies it as an "Order" intent[cite: 735].
+3. [cite_start]**Intelligence:** The **Details Agent** retrieves current pricing from **Pinecone**[cite: 820], while the **Recommendation Agent** suggests a pairing based on the Apriori model.
+4. [cite_start]**Real-time Sync:** The order is updated in the **Firebase Realtime Database** [cite: 631][cite_start], and the item appears instantly in the app's Cart[cite: 288].
