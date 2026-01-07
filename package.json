@@ -2,6 +2,7 @@
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
     "@react-native-firebase/app": "^20.5.0",
-    "@react-native-firebase/firestore": "^20.5.0"
+    "@react-native-firebase/firestore": "^20.5.0",
+    "react-native-responsive-screen": "^1.4.2"
   }
 }
